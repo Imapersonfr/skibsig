@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mental illnesses</title>
+
+<style>
+/* ---------- BUTTONS ---------- */
+#startBtn, #submitBtn {
+  padding: 15px 30px;
+  background: #3a5eff;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+#startBtn:hover, #submitBtn:hover { background: #5a7eff; transform: scale(1.05); }
+
+/* ---------- FEEDBACK UI ---------- */
+#feedbackLayer {
+  position: fixed;
+  inset: 0;
+  background: black;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 50;
+  padding: 20px;
+  text-align: center;
+}
+
+#feedbackTitle {
+  font-size: 28px;
+  transition: all 1.5s ease-in-out;
+  margin-bottom: 20px;
+  max-width: 600px;
+}
+
+#inputArea {
+  opacity: 0;
+  transition: opacity 1s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+textarea {
+  width: 400px;
+  height: 100px;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: sans-serif;
+  font-size: 16px;
+}
+
+/* ---------- SYSTEM STYLES ---------- */
+html, body { margin: 0; padding: 0; overflow: hidden; background: black; font-family: system-ui, sans-serif; }
+#loading { position: fixed; inset: 0; background: black; color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; z-index: 10; }
+#menu { position: fixed; inset: 0; background: radial-gradient(#222, #000); display: none; align-items: center; justify-content: center; flex-direction: column; color: white; z-index: 9; transition: opacity 1s; }
+#menu h1 { font-size: 56px; margin-bottom: 40px; }
+#tasks { position: fixed; top: 10px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 10px; border-radius: 8px; display: none; z-index: 5; }
+.task-failed { text-decoration: line-through; opacity: 0.6; }
+.task.done { opacity: 0.6; }
+#game { width: 100vw; height: 100vh; display: none; pointer-events: none; }
+
+.body { fill: #3a5eff; stroke: black; stroke-width: 2; }
+.head { fill: #ff5555; }
+.house { fill: #8b5a2b; }
+.tree { fill: #2e7d32; }
+.stick { fill: #a67c52; }
+.fence-rail { fill: none; stroke: #5d4037; stroke-width: 4; }
+.fence-post { fill: #5d4037; stroke: #3e2723; stroke-width: 1; }
+
+.shadow-body { fill: rgba(0,0,0,0.8); filter: blur(2px); }
+.shadow-speech-bg { fill: white; stroke: black; stroke-width: 1; }
+.shadow-speech-text { fill: black; font-size: 10px; font-weight: bold; }
+
+#thought { opacity: 0; transition: opacity 0.4s; }
+.thought-bg { fill: white; stroke: black; }
+.thought-text { fill: black; font-size: 12px; }
+
+#fade { position: fixed; inset: 0; background: black; opacity: 0; pointer-events: none; transition: opacity 1s; z-index: 20; }
+#fadeTitle { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 48px; color: white; opacity: 0; z-index: 21; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">Loading…</div>
+
+<div id="menu">
+  <h1>Mental illnesses</h1>
+  <div id="startBtn">Start</div>
+</div>
+
+<div id="tasks">
+  <div id="task-homework">⬜ Go do homework</div>
+  <div id="task-stick" style="display:none;">⬜ Check out the stick</div>
+  <div id="task-fence" style="display:none;">⬜ Go to the fence and play</div>
+  <div id="task-walk" style="display:none;">⬜ Walk around</div>
+</div>
+
+<div id="feedbackLayer">
+    <div id="feedbackTitle">TO BE CONTINUED</div>
+    <div id="inputArea">
+        <textarea id="userResponse" placeholder="Type your thoughts here..."></textarea>
+        <button id="submitBtn">Continue</button>
+    </div>
+</div>
+
+<div id="fade"></div>
+<div id="fadeTitle">ADHD</div>
+
+<svg id="game" viewBox="0 0 800 600">
+  <g id="world">
+    <rect x="-2000" y="-2000" width="4000" height="4000" fill="#6bb96b"/>
+    <g id="fence-group">
+      <rect class="fence-rail" x="-500" y="-500" width="1300" height="4"/>
+      <rect class="fence-rail" x="-500" y="500" width="1300" height="4"/>
+      <rect class="fence-rail" x="-500" y="-500" width="4" height="1000"/>
+      <rect class="fence-rail" x="800" y="-500" width="4" height="1000"/>
+    </g>
+
+    <rect id="house" class="house" x="320" y="-40" width="140" height="140"/>
+    <rect class="tree" x="160" y="-120" width="60" height="60"/>
+    <rect id="stick" class="stick" x="190" y="-20" width="30" height="6" opacity="0"/>
+
+    <g id="shadowFigure" style="display:none;">
+        <ellipse class="shadow-body" cx="0" cy="0" rx="15" ry="15"/>
+        <rect class="shadow-body" x="-12" y="0" width="24" height="30"/>
+        <g transform="translate(20, -30)">
+            <ellipse class="shadow-speech-bg" rx="30" ry="15" />
+            <text class="shadow-speech-text" text-anchor="middle" y="4">hey dude</text>
+        </g>
+    </g>
+  </g>
+
+  <g transform="translate(400 300)">
+    <rect class="body" x="-10" y="-10" width="20" height="20"/>
+    <polygon id="head" class="head" points="0,-18 6,-8 -6,-8"/>
+    <g id="thought" transform="translate(0,-50)">
+      <ellipse class="thought-bg" cx="0" cy="0" rx="80" ry="22"/>
+      <text id="thoughtText" class="thought-text" x="-70" y="5"></text>
+    </g>
+  </g>
+</svg>
+
+<script>
+const loading = document.getElementById("loading"), menu = document.getElementById("menu"),
+      startBtn = document.getElementById("startBtn"), game = document.getElementById("game"),
+      tasksUI = document.getElementById("tasks"), world = document.getElementById("world"),
+      head = document.getElementById("head"), thought = document.getElementById("thought"),
+      thoughtText = document.getElementById("thoughtText"), stick = document.getElementById("stick"),
+      fade = document.getElementById("fade"), fadeTitle = document.getElementById("fadeTitle"),
+      taskHomework = document.getElementById("task-homework"), taskStick = document.getElementById("task-stick"),
+      taskFence = document.getElementById("task-fence"), taskWalk = document.getElementById("task-walk"),
+      shadowFigure = document.getElementById("shadowFigure"), feedbackLayer = document.getElementById("feedbackLayer"),
+      feedbackTitle = document.getElementById("feedbackTitle"), inputArea = document.getElementById("inputArea"),
+      submitBtn = document.getElementById("submitBtn"), userResponse = document.getElementById("userResponse");
+
+const player = { x: 0, y: 0, speed: 4, facing: 0, control: false };
+const keys = {};
+let stage = -1, startTime = 0, transitioned = false, shadowActive = false;
+
+window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+function showThought(text, duration = 2000) {
+  thoughtText.textContent = text; thought.style.opacity = 1;
+  setTimeout(() => thought.style.opacity = 0, duration);
+}
+
+// Generate Fence Posts
+const fenceGroup = document.getElementById('fence-group');
+for(let x = -500; x <= 800; x += 100) { createPost(x, -500); createPost(x, 500); }
+for(let y = -400; y <= 400; y += 100) { createPost(-500, y); createPost(800, y); }
+function createPost(x, y) {
+  const post = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  post.setAttribute("class", "fence-post");
+  post.setAttribute("x", x - 6); post.setAttribute("y", y - 6);
+  post.setAttribute("width", 12); post.setAttribute("height", 12);
+  fenceGroup.appendChild(post);
+}
+
+setTimeout(() => { loading.style.display = "none"; menu.style.display = "flex"; }, 1500);
+
+startBtn.addEventListener("click", () => {
+  menu.style.opacity = "0";
+  setTimeout(() => {
+    menu.style.display = "none";
+    fade.style.opacity = "1";
+    fadeTitle.textContent = "ADHD";
+    fadeTitle.style.opacity = "1";
+    setTimeout(() => {
+        fadeTitle.style.opacity = "0"; fade.style.opacity = "0";
+        game.style.display = "block"; game.style.pointerEvents = "auto";
+        tasksUI.style.display = "block"; player.control = true;
+        stage = 0; startTime = performance.now();
+        requestAnimationFrame(update);
+    }, 2000);
+  }, 1000);
+});
+
+function update(time) {
+  let dx = 0, dy = 0;
+  if (player.control) {
+    if (keys.w || keys.arrowup) dy -= player.speed;
+    if (keys.s || keys.arrowdown) dy += player.speed;
+    if (keys.a || keys.arrowleft) dx -= player.speed;
+    if (keys.d || keys.arrowright) dx += player.speed;
+  }
+  if (dx || dy) {
+    player.x += dx; player.y += dy;
+    if (player.x < -485) player.x = -485; if (player.x > 785) player.x = 785;
+    if (player.y < -485) player.y = -485; if (player.y > 485) player.y = 485;
+    player.facing = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+  }
+
+  if (stage === 0 && (time - startTime) > 1000) { showThought("I'm going to do homework"); stage = 1; }
+
+  if (stage === 1 && player.x > 180) {
+    taskHomework.classList.add("task-failed"); taskHomework.textContent = "Go do homework";
+    stick.style.opacity = 1; taskStick.style.display = "block";
+    showThought("oh i want to go to that stick and play with it"); stage = 2;
+  }
+
+  if (stage === 2 && !taskStick.classList.contains("done") && Math.abs(player.x - 190) < 30 && Math.abs(player.y - (-20)) < 30) {
+    taskStick.textContent = "✅ Check out the stick"; taskStick.classList.add("done");
+    taskFence.style.display = "block"; showThought("this is boring, I'll go play at the fence"); stage = 3;
+  }
+
+  if (stage === 3 && !transitioned) {
+    const atFence = (player.y <= -480 || player.y >= 480 || player.x <= -480 || player.x >= 780);
+    if (atFence) {
+      taskFence.textContent = "✅ Go to the fence and play"; taskFence.classList.add("done");
+      transitioned = true; player.control = false; fade.style.opacity = 1;
+      setTimeout(() => { fadeTitle.textContent = "Schizophrenia"; fadeTitle.style.opacity = 1; }, 600);
+      setTimeout(() => {
+        fadeTitle.style.opacity = 0; fade.style.opacity = 0;
+        player.x = 0; player.y = 0; player.control = true;
+        stick.style.opacity = 0; taskHomework.style.display = "none"; taskStick.style.display = "none"; taskFence.style.display = "none";
+        taskWalk.style.display = "block";
+        stage = 4; setTimeout(triggerShadowFigure, 15000);
+      }, 3000);
+    }
+  }
+
+  head.setAttribute("transform", `rotate(${player.facing})`);
+  world.setAttribute("transform", `translate(${400 - player.x}, ${300 - player.y})`);
+  if (stage !== -1) requestAnimationFrame(update);
+}
+
+function triggerShadowFigure() {
+  if (shadowActive) return;
+  shadowActive = true; player.control = false;
+  taskWalk.textContent = "✅ Walk around";
+  taskWalk.classList.add("done");
+
+  const angleRad = (player.facing - 90) * (Math.PI / 180);
+  const shadowX = player.x - Math.cos(angleRad) * 60;
+  const shadowY = player.y - Math.sin(angleRad) * 60;
+  shadowFigure.setAttribute("transform", `translate(${shadowX}, ${shadowY})`);
+  shadowFigure.style.display = "block";
+
+  setTimeout(() => {
+    shadowFigure.style.display = "none"; player.facing += 180;
+    setTimeout(() => {
+      player.control = true;
+      setTimeout(() => {
+          taskWalk.style.display = "none";
+          triggerAnxietyTransition();
+      }, 5000);
+    }, 2000);
+  }, 2000);
+}
+
+function triggerAnxietyTransition() {
+    player.control = false; fade.style.opacity = 1;
+    setTimeout(() => {
+        fadeTitle.textContent = "Anxiety"; fadeTitle.style.opacity = 1;
+        setTimeout(() => {
+            fadeTitle.style.opacity = 0; fade.style.opacity = 0;
+            player.x = 0; player.y = 0; player.control = true;
+            stage = 5; showThought("I feel... uneasy.");
+            setTimeout(triggerToBeContinued, 4000);
+        }, 3000);
+    }, 600);
+}
+
+function triggerToBeContinued() {
+    player.control = false;
+    feedbackLayer.style.display = "flex";
+    setTimeout(() => {
+        feedbackTitle.style.opacity = "0";
+        setTimeout(() => {
+            feedbackTitle.textContent = "What is something you thought or said? What is something you felt while playing?";
+            feedbackTitle.style.opacity = "1";
+            setTimeout(() => {
+                feedbackTitle.style.fontSize = "20px"; feedbackTitle.style.marginTop = "-150px";
+                inputArea.style.opacity = "1";
+            }, 3000);
+        }, 1000);
+    }, 3000);
+}
+
+submitBtn.addEventListener("click", () => {
+    submitBtn.disabled = true;
+    userResponse.disabled = true;
+    feedbackLayer.style.transition = "opacity 3s ease-in-out";
+    feedbackLayer.style.opacity = "0";
+    setTimeout(() => {
+        feedbackLayer.style.display = "none";
+        game.style.display = "none";
+        tasksUI.style.display = "none";
+        document.body.style.backgroundColor = "black";
+    }, 3000);
+});
+</script>
+</body>
+</html>
